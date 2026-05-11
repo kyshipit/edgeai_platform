@@ -45,10 +45,10 @@ A general-purpose, extensible edge AI inference platform built on the Rockchip R
 
 ```
 edgeai_platform/
-├── model_zoo/                  # Model training, conversion, quantization (PC-side)
-│   ├── train/                  # Training scripts (PyTorch)
+├── model_zoo/                  # Model conversion, quantization (PC-side)
+│   ├── output/                 # onnx and rknn end files
 │   ├── convert/                # Model conversion scripts (PyTorch → ONNX → RKNN)
-│   ├── calibrate/              # INT8 quantization calibration dataset
+│   ├── data/                   # INT8 quantization calibration dataset
 │   └── requirements.txt        # Python dependencies
 ├── runtime/                    # On-device C++ inference framework (cross-compile)
 │   ├── CMakeLists.txt          # Cross-compilation build config
@@ -56,8 +56,8 @@ edgeai_platform/
 │   ├── engine/                 # Core inference engine (thread pool, scheduler, pipeline)
 │   ├── adapters/               # Model-specific adapters (YOLO, ViT, ResNet)
 │   ├── preprocess/             # Image preprocessing (RGA hardware acceleration)
+│   ├── config/                 # YAML runtime configuration files
 │   └── utils/                  # Shared utilities (logger, timer, config parser)
-├── config/                     # YAML runtime configuration files
 ├── assets/                     # Static assets (benchmark charts, screenshots, architecture diagrams)
 ├── tests/                      # Unit tests and integration tests
 ├── tools/                      # Helper scripts (board info, model deployment)

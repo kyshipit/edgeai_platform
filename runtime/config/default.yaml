@@ -1,0 +1,11 @@
+# runtime/config/default.yaml
+model:
+  type: yolo
+  path: ./model/yolov5.rknn
+system:
+  infer_threads: 3
+  npu_cores: [0,1,2]
+input:
+  source: /dev/video0
+  width: 640
+  height: 640
