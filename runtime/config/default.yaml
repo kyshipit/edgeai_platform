@@ -3,9 +3,9 @@ model:
   type: yolo
   path: ./model/yolov5.rknn
 system:
-  infer_threads: 3
-  npu_cores: [0,1,2]
+  infer_threads: 1
+  npu_cores: [7]
 input:
-  source: /dev/video0
+  source: /dev/video-camera0
   width: 640
   height: 640

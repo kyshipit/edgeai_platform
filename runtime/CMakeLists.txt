@@ -22,12 +22,12 @@ set(OPENCV_LIBS opencv_core opencv_flann opencv_videoio opencv_video opencv_high
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
-file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cc)
-
 add_executable(${PROJECT_NAME}
     main.cc
-    postprocess.cc
-    ${rknpu_yolov5_file}
+    adapters/yolo_adapter.cpp
+    adapters/yolo_postprocess.cpp
+    engine/pipeline.cpp
+    engine/thread_pool.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -45,6 +45,7 @@ target_link_libraries(${PROJECT_NAME} Threads::Threads)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/adapters
     ${LIBRKNNRT_INCLUDES}
 )
 

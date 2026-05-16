@@ -131,7 +131,7 @@ public:
             if (trim_line.empty() || trim_line[0] == '#') continue;
 
             // 计算缩进
-            int indent = 0;
+            size_t indent = 0;
             while (indent < line.size() && std::isspace(static_cast<unsigned char>(line[indent]))) indent++;
             std::string content = line.substr(indent);
 
@@ -143,7 +143,7 @@ public:
             std::string val = trim(content.substr(colon + 1));
 
             // 调整嵌套层级
-            while (stack.size() > 1 && indent <= (int)(stack.size() - 2) * 4) {
+            while (stack.size() > 1 && indent <= (stack.size() - 2) * 4) {
                 stack.pop_back();
             }
 

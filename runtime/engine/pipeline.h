@@ -4,30 +4,29 @@
 #include <vector>
 #include <thread>
 #include <atomic>
-#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp> // 完整的 OpenCV 功能
 #include "bounded_queue.h"
 #include "thread_pool.h"
 #include "adapter_interface.h"
 
-// 流水线任务包
+// 流水线任务包。每个任务包含原始帧和对应的预处理结果指针，
+// 以及用于推理/后处理的模型适配器实例。
 struct InferenceTask {
     int frame_id;
-    cv::Mat original_frame;                 // 原始帧（用于最终绘制）
-    uint8_t* input_buf = nullptr;           // 指向预处理后的数据
+    cv::Mat original_frame;                 
+    uint8_t* input_buf = nullptr;           
     int input_size = 0;
-    std::shared_ptr<IModelAdapter> adapter; // 负责推理的适配器实例（持有内存）
+    std::shared_ptr<void> model_output;
+    std::shared_ptr<IModelAdapter> adapter; 
 };
 
 class Pipeline {
 public:
-    // 构造函数：传入基准适配器（未初始化）、模型路径、线程数、NPU 掩码、CPU 绑定等
     Pipeline(std::shared_ptr<IModelAdapter> base_adapter,
              const std::string& model_path,
              int num_infer_threads,
              const std::vector<int>& npu_cores,
-             const std::vector<int>& cpu_cores = {4,5,6},
-             int pre_queue_capacity = 2,
-             int post_queue_capacity = 2);
+             const std::string& input_source = "0");
     ~Pipeline();
 
     void Run();   // 启动流水线，阻塞直到停止
@@ -37,28 +36,23 @@ private:
     void PreprocessLoop();
     void InferenceLoop(int thread_id);
     void PostprocessLoop();
-
-    // 绘制结果（使用正点原子 utils 或 OpenCV）
     void DrawResult(cv::Mat& frame, const std::string& result_json);
 
-    // 配置
+    std::string input_source_;
     std::string model_path_;
     int num_infer_threads_;
     std::vector<int> npu_cores_;
-    std::vector<int> cpu_cores_;
 
-    // 队列
-    BoundedQueue<InferenceTask> pre_queue_;
+    // 每个推理线程使用独立队列，避免竞争和绑定对应的模型实例
+    std::vector<std::unique_ptr<BoundedQueue<InferenceTask>>> infer_queues_;
     BoundedQueue<InferenceTask> post_queue_;
 
-    // 线程池和单独线程
     std::unique_ptr<ThreadPool> infer_pool_;
     std::thread pre_thread_, post_thread_;
     std::atomic<bool> stop_{false};
+    std::atomic<uint64_t> processed_frames_{0};
+    std::chrono::steady_clock::time_point start_time_;
 
-    // 为每个推理线程保留独立的适配器实例
     std::vector<std::shared_ptr<IModelAdapter>> adapters_;
-
-    // 视频捕获设备
     cv::VideoCapture capture_;
 };

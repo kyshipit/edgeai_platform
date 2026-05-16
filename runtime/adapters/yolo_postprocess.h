@@ -7,6 +7,17 @@
 #include "common.h"
 #include "image_utils.h"
 
+typedef struct {
+    rknn_context rknn_ctx;
+    rknn_input_output_num io_num;
+    rknn_tensor_attr* input_attrs;
+    rknn_tensor_attr* output_attrs;
+    int model_channel;
+    int model_width;
+    int model_height;
+    bool is_quant;
+} rknn_app_context_t;
+
 #define OBJ_NAME_MAX_SIZE 64
 #define OBJ_NUMB_MAX_SIZE 128
 #define OBJ_CLASS_NUM 80

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "yolov5.h"
-
+#include "yolo_postprocess.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -450,6 +449,20 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
 #else
     rknn_output *_outputs = (rknn_output *)outputs;
 #endif
+    // Basic validation: ensure output buffers are present and sizes match expected layout
+    for (int i = 0; i < app_ctx->io_num.n_output; ++i) {
+#if defined(RV1106_1103)
+        if (!_outputs[i] || _outputs[i]->virt_addr == NULL) {
+            fprintf(stderr, "post_process: output[%d] virt_addr is NULL\n", i);
+            return -1;
+        }
+#else
+        if (_outputs[i].buf == NULL) {
+            fprintf(stderr, "post_process: output[%d].buf is NULL\n", i);
+            return -1;
+        }
+#endif
+    }
     std::vector<float> filterBoxes;
     std::vector<float> objProbs;
     std::vector<int> classId;
@@ -493,6 +506,23 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
         grid_h = app_ctx->output_attrs[i].dims[2];
         grid_w = app_ctx->output_attrs[i].dims[3];
         stride = model_in_h / grid_h;
+        // Validate buffer size vs expected elements: PROP_BOX_SIZE * grid_len * anchors
+        {
+            int grid_len = grid_h * grid_w;
+            size_t expected_elems = (size_t)PROP_BOX_SIZE * (size_t)grid_len * 3u;
+#if defined(RV1106_1103)
+            size_t buf_bytes = _outputs[i]->size;
+            size_t expected_bytes = expected_elems * sizeof(int8_t); // RV1106 uses i8
+#else
+            size_t buf_bytes = _outputs[i].size;
+            size_t expected_bytes = app_ctx->is_quant ? expected_elems * sizeof(int8_t) : expected_elems * sizeof(float);
+#endif
+            if (buf_bytes < expected_bytes) {
+                fprintf(stderr, "post_process: output[%d] buffer too small (%zu < %zu), grid=%dx%d, is_quant=%d\n",
+                        i, buf_bytes, expected_bytes, grid_h, grid_w, app_ctx->is_quant);
+                return -1;
+            }
+        }
         if (app_ctx->is_quant)
         {
             validCount += process_i8((int8_t *)_outputs[i].buf, (int *)anchor[i], grid_h, grid_w, model_in_h, model_in_w, stride, filterBoxes, objProbs,
