@@ -12,7 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+ * yolo_postprocess.cpp
+ *
+ * 与正点原子 runtime/cpp/postprocess.cc 保持同步（检测/NMS/标签）。
+ * 平台仅通过 YoloAdapter 调用；修改逻辑时请先改 cpp 再覆盖本文件。
+ */
+
 #include "yolo_postprocess.h"
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -30,8 +38,10 @@ const int anchor[3][6] = {{10, 13, 16, 30, 33, 23},
                           {30, 61, 62, 45, 59, 119},
                           {116, 90, 156, 198, 373, 326}};
 
+/* 将浮点限制在 [min,max] 并转 int */
 inline static int clamp(float val, int min, int max) { return val > min ? (val < max ? val : max) : min; }
 
+/* 从 FILE 读取一行，动态分配缓冲区 */
 static char *readLine(FILE *fp, char *buffer, int *len)
 {
     int ch;
@@ -69,6 +79,7 @@ static char *readLine(FILE *fp, char *buffer, int *len)
     return buffer;
 }
 
+/* 读取标签文件全部行到 lines[] */
 static int readLines(const char *fileName, char *lines[], int max_line)
 {
     FILE *file = fopen(fileName, "r");
@@ -92,6 +103,7 @@ static int readLines(const char *fileName, char *lines[], int max_line)
     return i;
 }
 
+/* 加载 COCO 类别名列表 */
 static int loadLabelName(const char *locationFilename, char *label[])
 {
     printf("load lable %s\n", locationFilename);
@@ -99,6 +111,7 @@ static int loadLabelName(const char *locationFilename, char *label[])
     return 0;
 }
 
+/* 计算两个矩形的 IoU */
 static float CalculateOverlap(float xmin0, float ymin0, float xmax0, float ymax0, float xmin1, float ymin1, float xmax1,
                               float ymax1)
 {
@@ -109,6 +122,7 @@ static float CalculateOverlap(float xmin0, float ymin0, float xmax0, float ymax0
     return u <= 0.f ? 0.f : (i / u);
 }
 
+/* 按类别对候选框做非极大值抑制 */
 static int nms(int validCount, std::vector<float> &outputLocations, std::vector<int> classIds, std::vector<int> &order,
                int filterId, float threshold)
 {
@@ -147,6 +161,7 @@ static int nms(int validCount, std::vector<float> &outputLocations, std::vector<
     return 0;
 }
 
+/* 按 obj 分数降序排列 indices */
 static int quick_sort_indice_inverse(std::vector<float> &input, int left, int right, std::vector<int> &indices)
 {
     float key;
@@ -180,16 +195,20 @@ static int quick_sort_indice_inverse(std::vector<float> &input, int left, int ri
     return low;
 }
 
+/* sigmoid 激活 */
 static float sigmoid(float x) { return 1.0 / (1.0 + expf(-x)); }
 
+/* sigmoid 反函数 */
 static float unsigmoid(float y) { return -1.0 * logf((1.0 / y) - 1.0); }
 
+/* 浮点裁剪后转 int32 */
 inline static int32_t __clip(float val, float min, float max)
 {
     float f = val <= min ? min : (val >= max ? max : val);
     return f;
 }
 
+/* float 转 int8 仿射量化值 */
 static int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
 {
     float dst_val = (f32 / scale) + zp;
@@ -197,6 +216,7 @@ static int8_t qnt_f32_to_affine(float f32, int32_t zp, float scale)
     return res;
 }
 
+/* float 转 uint8 仿射量化值 */
 static uint8_t qnt_f32_to_affine_u8(float f32, int32_t zp, float scale)
 {
     float dst_val = (f32 / scale) + zp;
@@ -204,9 +224,12 @@ static uint8_t qnt_f32_to_affine_u8(float f32, int32_t zp, float scale)
     return res;
 }
 
+/* int8 反量化为 float */
 static float deqnt_affine_to_f32(int8_t qnt, int32_t zp, float scale) { return ((float)qnt - (float)zp) * scale; }
+/* uint8 反量化为 float */
 static float deqnt_affine_u8_to_f32(uint8_t qnt, int32_t zp, float scale) { return ((float)qnt - (float)zp) * scale; }
 
+/* RKNPU1：uint8 融合头单尺度解码 */
 static int process_u8(uint8_t *input, int *anchor, int grid_h, int grid_w, int height, int width, int stride,
                       std::vector<float> &boxes, std::vector<float> &objProbs, std::vector<int> &classId, float threshold,
                       int32_t zp, float scale)
@@ -264,6 +287,7 @@ static int process_u8(uint8_t *input, int *anchor, int grid_h, int grid_w, int h
     return validCount;
 }
 
+/* RK3588 等：int8 融合头单尺度解码（85 通道 × 3 anchor） */
 static int process_i8(int8_t *input, int *anchor, int grid_h, int grid_w, int height, int width, int stride,
                       std::vector<float> &boxes, std::vector<float> &objProbs, std::vector<int> &classId, float threshold,
                       int32_t zp, float scale)
@@ -321,6 +345,7 @@ static int process_i8(int8_t *input, int *anchor, int grid_h, int grid_w, int he
     return validCount;
 }
 
+/* RV1106：int8 布局不同的单尺度解码 */
 static int process_i8_rv1106(int8_t *input, int *anchor, int grid_h, int grid_w, int height, int width, int stride,
                       std::vector<float> &boxes, std::vector<float> &boxScores, std::vector<int> &classId, float threshold,
                       int32_t zp, float scale) {
@@ -386,6 +411,7 @@ static int process_i8_rv1106(int8_t *input, int *anchor, int grid_h, int grid_w,
     return validCount;
 }
 
+/* 浮点融合头单尺度解码 */
 static int process_fp32(float *input, int *anchor, int grid_h, int grid_w, int height, int width, int stride,
                         std::vector<float> &boxes, std::vector<float> &objProbs, std::vector<int> &classId, float threshold)
 {
@@ -442,6 +468,7 @@ static int process_fp32(float *input, int *anchor, int grid_h, int grid_w, int h
     return validCount;
 }
 
+/* 三尺度解码 + 按类 NMS + letterbox 反变换，写入 od_results（与 cpp/postprocess.cc 一致） */
 int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter_box, float conf_threshold, float nms_threshold, object_detect_result_list *od_results)
 {
 #if defined(RV1106_1103) 
@@ -449,20 +476,6 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
 #else
     rknn_output *_outputs = (rknn_output *)outputs;
 #endif
-    // Basic validation: ensure output buffers are present and sizes match expected layout
-    for (int i = 0; i < app_ctx->io_num.n_output; ++i) {
-#if defined(RV1106_1103)
-        if (!_outputs[i] || _outputs[i]->virt_addr == NULL) {
-            fprintf(stderr, "post_process: output[%d] virt_addr is NULL\n", i);
-            return -1;
-        }
-#else
-        if (_outputs[i].buf == NULL) {
-            fprintf(stderr, "post_process: output[%d].buf is NULL\n", i);
-            return -1;
-        }
-#endif
-    }
     std::vector<float> filterBoxes;
     std::vector<float> objProbs;
     std::vector<int> classId;
@@ -506,23 +519,6 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
         grid_h = app_ctx->output_attrs[i].dims[2];
         grid_w = app_ctx->output_attrs[i].dims[3];
         stride = model_in_h / grid_h;
-        // Validate buffer size vs expected elements: PROP_BOX_SIZE * grid_len * anchors
-        {
-            int grid_len = grid_h * grid_w;
-            size_t expected_elems = (size_t)PROP_BOX_SIZE * (size_t)grid_len * 3u;
-#if defined(RV1106_1103)
-            size_t buf_bytes = _outputs[i]->size;
-            size_t expected_bytes = expected_elems * sizeof(int8_t); // RV1106 uses i8
-#else
-            size_t buf_bytes = _outputs[i].size;
-            size_t expected_bytes = app_ctx->is_quant ? expected_elems * sizeof(int8_t) : expected_elems * sizeof(float);
-#endif
-            if (buf_bytes < expected_bytes) {
-                fprintf(stderr, "post_process: output[%d] buffer too small (%zu < %zu), grid=%dx%d, is_quant=%d\n",
-                        i, buf_bytes, expected_bytes, grid_h, grid_w, app_ctx->is_quant);
-                return -1;
-            }
-        }
         if (app_ctx->is_quant)
         {
             validCount += process_i8((int8_t *)_outputs[i].buf, (int *)anchor[i], grid_h, grid_w, model_in_h, model_in_w, stride, filterBoxes, objProbs,
@@ -586,6 +582,7 @@ int post_process(rknn_app_context_t *app_ctx, void *outputs, letterbox_t *letter
     return 0;
 }
 
+/* 加载 ./model/coco_80_labels_list.txt */
 int init_post_process()
 {
     int ret = 0;
@@ -598,6 +595,7 @@ int init_post_process()
     return 0;
 }
 
+/* 类别 id → 名称字符串 */
 char *coco_cls_to_name(int cls_id)
 {
 
@@ -614,6 +612,7 @@ char *coco_cls_to_name(int cls_id)
     return "null";
 }
 
+/* 释放标签字符串内存 */
 void deinit_post_process()
 {
     for (int i = 0; i < OBJ_CLASS_NUM; i++)

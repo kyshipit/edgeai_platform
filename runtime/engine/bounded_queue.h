@@ -1,18 +1,16 @@
 /*
-线程安全的有界阻塞队列，用于流水线阶段之间的帧传递：
-容量限制：防止生产者跑太快撑爆内存。
-阻塞 push/pop：队列满时生产者等待，空时消费者等待。
-支持超时（用于优雅退出）。
-
-使用场景：
-pre_queue：存放预处理完成的帧，等待推理线程。
-post_queue：存放推理结果，等待后处理/显示。
-
-*/
-
-
-// engine/bounded_queue.h (header-only（模板类）)
-// engine/bounded_queue.h
+ * engine/bounded_queue.h
+ *
+ * 【engine 层】线程安全有界阻塞队列，用于流水线阶段间传递 InferenceTask。
+ *
+ * - 容量上限：防止预处理过快撑爆内存（背压）。
+ * - Push 满则阻塞，Pop 空则阻塞。
+ * - TryPop：带超时，可用于优雅退出（当前 Pipeline 主要用哨兵任务 frame_id==-1）。
+ *
+ * Pipeline 中的用法：
+ * - infer_queues_[i]：预处理线程 → 第 i 个推理线程
+ * - post_queue_：推理线程 → 后处理/显示线程
+ */
 #pragma once
 #include <queue>
 #include <mutex>
@@ -29,6 +27,17 @@ public:
         not_full_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push(std::move(item));
         not_empty_.notify_one();
+    }
+
+    bool TryPush(T item, int timeout_ms) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!not_full_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+                                [this] { return queue_.size() < capacity_; })) {
+            return false;
+        }
+        queue_.push(std::move(item));
+        not_empty_.notify_one();
+        return true;
     }
 
     T Pop() {

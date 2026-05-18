@@ -2,10 +2,43 @@
 model:
   type: yolo
   path: ./model/yolov5.rknn
+  yolo:
+    person_threshold_percent: 35
+  scrfd:
+    path: ./model/scrfd.rknn
+    conf_threshold_percent: 50
+    nms_threshold_percent: 50
+  ppocr:
+    det_path: ./model/ppocrv4_det.rknn
+    rec_path: ./model/ppocrv4_rec.rknn
+    det_threshold_percent: 20
+    box_threshold_percent: 45
+    rec_score_threshold_percent: 35
+    min_infer_width: 960
 system:
-  infer_threads: 1
-  npu_cores: [7]
+  infer_threads: 3
+  npu_cores: [0, 1, 2]
+  switch:
+    present_threshold: 15
+    absent_threshold: 30
+    text_absent_threshold: 150
+    # person 稳定 -> scrfd（人脸）；非 ppocr
+    # to_ppocr: text=需 text_region_present；frames=联调；off=不自动切 OCR
+    to_ppocr: text
+    auto_back_to_yolo: false
+    back_to_yolo_on: no_text
+    min_ppocr_frames: 90
+    single_thread: false
 input:
   source: /dev/video-camera0
-  width: 640
-  height: 640
+  rotate: ccw90
+  width: 0
+  height: 0
+  show_window: true
+  display:
+    screen_width: 1080
+    screen_height: 1920
+    max_screen_ratio_percent: 85
+    fullscreen: false
+    title_bar_reserve_px: 56
+  log_ocr_interval_frames: 30

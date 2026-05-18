@@ -1,12 +1,12 @@
 /*
-一个固定大小的线程池，支持：
-任意返回类型的任务入队（通过 std::future）。
-CPU 亲和性绑定（未来每个推理线程绑定到大核）。
-优雅停止（析构时 join 所有线程）。
-*/
-
-
-// engine/thread_pool.h
+ * engine/thread_pool.h
+ *
+ * 【engine 层】固定大小线程池，供 Pipeline 启动多个长期运行的 InferenceLoop。
+ *
+ * - Enqueue 返回 std::future，可获取任务返回值。
+ * - 构造时可指定 cpu_affinity，将工作线程绑定到指定 CPU 核。
+ * - 析构时 stop_ 置位并 join 所有 worker。
+ */
 #pragma once
 #include <vector>
 #include <queue>

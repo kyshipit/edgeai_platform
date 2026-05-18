@@ -15,42 +15,57 @@ set(rknpu_yolov5_file rknpu2/yolov5.cc)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ 3rdparty.out)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/utils/ utils.out)
 
-# opencv
 include_directories(${SYSROOT})
 include_directories(${SYSROOT}/opencv4)
-set(OPENCV_LIBS opencv_core opencv_flann opencv_videoio opencv_video opencv_highgui opencv_imgcodecs opencv_imgproc)
+set(OPENCV_LIBS opencv_core opencv_flann opencv_videoio opencv_video opencv_highgui opencv_imgcodecs opencv_imgproc opencv_dnn)
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
-add_executable(${PROJECT_NAME}
-    main.cc
-    adapters/yolo_adapter.cpp
-    adapters/yolo_postprocess.cpp
+set(RUNTIME_SRC
+    app/main.cc
     engine/pipeline.cpp
     engine/thread_pool.cpp
+    platform/model_coordinator.cpp
+    io/camera_source.cpp
+    io/frame_transform.cpp
+    viz/opencv_display_sink.cpp
+    viz/result_overlay.cpp
+    adapters/yolo/yolo_adapter.cpp
+    adapters/yolo/yolo_postprocess.cpp
+    adapters/scrfd/scrfd_adapter.cpp
+    adapters/scrfd/scrfd_postprocess.cpp
+    adapters/ppocr/ppocr_adapter.cpp
+    adapters/ppocr/ppocr_system.cc
+    adapters/ppocr/postprocess.cc
+    adapters/ppocr/clipper.cc
 )
 
-target_link_libraries(${PROJECT_NAME}
+add_executable(edgeai_platform_demo ${RUNTIME_SRC})
+
+target_link_libraries(edgeai_platform_demo
     imageutils
     fileutils
     imagedrawing
-    ${OPENCV_LIBS}    
+    ${OPENCV_LIBS}
     ${LIBRKNNRT}
 )
 
-# 使用pthread线程库
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(${PROJECT_NAME} Threads::Threads)
+target_link_libraries(edgeai_platform_demo Threads::Threads)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(edgeai_platform_demo PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/adapters
+    ${CMAKE_CURRENT_SOURCE_DIR}/adapters/yolo
+    ${CMAKE_CURRENT_SOURCE_DIR}/adapters/scrfd
+    ${CMAKE_CURRENT_SOURCE_DIR}/adapters/ppocr
     ${LIBRKNNRT_INCLUDES}
 )
 
-install(TARGETS ${PROJECT_NAME} DESTINATION .)
+install(TARGETS edgeai_platform_demo DESTINATION .)
 install(FILES ${LIBRKNNRT} DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION ./model)
 file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
 install(FILES ${RKNN_FILES} DESTINATION model)
+file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/*.yaml")
+install(FILES ${CONFIG_FILES} DESTINATION config)

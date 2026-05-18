@@ -15,7 +15,7 @@ case ${TARGET_SOC} in
         ;;
 esac
 
-TARGET_SDK="atk_rknn_${BUILD_DEMO_NAME}"
+TARGET_SDK="rknn_${BUILD_DEMO_NAME}"
 TARGET_PLATFORM=${TARGET_SOC}_linux
 TARGET_PLATFORM=${TARGET_PLATFORM}_${TARGET_ARCH}
 ROOT_PWD=$( cd "$( dirname $0 )" && cd -P "$( dirname "$SOURCE" )" && pwd )

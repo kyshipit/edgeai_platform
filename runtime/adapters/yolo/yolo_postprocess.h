@@ -1,3 +1,9 @@
+/*
+ * adapters/yolo_postprocess.h
+ *
+ * YOLOv5 后处理 API（实现见 yolo_postprocess.cpp，与 runtime/cpp/postprocess.h 对齐）。
+ * 仅供 YoloAdapter 使用；engine 不直接依赖本模块。
+ */
 #ifndef _RKNN_YOLOV5_DEMO_POSTPROCESS_H_
 #define _RKNN_YOLOV5_DEMO_POSTPROCESS_H_
 

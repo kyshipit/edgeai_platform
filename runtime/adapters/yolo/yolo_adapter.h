@@ -1,3 +1,8 @@
+/*
+ * adapters/yolo_adapter.h
+ *
+ * YOLOv5 RKNN 插件；实现与 runtime/cpp/yolov5.cc、main.cc 对齐，见 adapters/yolo/README.md。
+ */
 #pragma once
 
 #include <memory>
@@ -25,10 +30,14 @@ public:
 	std::string Postprocess(const std::shared_ptr<void>& model_output) override;
 	// Clone: 生成当前适配器的独立副本，用于多线程推理。
 	std::shared_ptr<IModelAdapter> Clone() const override;
+	AdapterSignals GetAdapterSignals() const override;
 
 	const object_detect_result_list& GetLastResults() const;
 
+	void SetPersonScoreThreshold(float threshold);
+
 private:
+	float person_score_threshold_ = 0.35f;
 	// RKNN 上下文和输入/输出信息
 	rknn_app_context_t app_ctx_;
 	// 用于存储预处理后图像的目标缓冲
