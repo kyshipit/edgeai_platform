@@ -1,8 +1,8 @@
 # runtime/config/default.yaml
 model:
   type: yolo
-  path: ./model/yolov5.rknn
   yolo:
+    path: ./model/yolov5.rknn
     person_threshold_percent: 35
   scrfd:
     path: ./model/scrfd.rknn

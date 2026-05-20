@@ -35,7 +35,7 @@ Pipeline::Pipeline(ModelCoordinator& coordinator,
     if (!coordinator_.Init("yolo", base_adapter, model_path, npu_cores, num_infer_threads)) {
         camera_.Release();
         throw std::runtime_error(
-            "ModelCoordinator failed to init adapters. Check model.path: " + model_path);
+            "ModelCoordinator failed to init adapters. Check model.yolo.path: " + model_path);
     }
 
     infer_pool_.reset(new ThreadPool(num_infer_threads_));

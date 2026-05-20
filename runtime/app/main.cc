@@ -7,7 +7,6 @@
 #include <vector>
 #include <atomic>
 #include <algorithm>
-#include <cctype>
 
 #include "engine/pipeline.h"
 #include "platform/logging.h"
@@ -43,23 +42,6 @@ static void stop_handler(int sig) {
     fprintf(stderr, "\nSignal received, request stop (workers will exit)...\n");
 }
 
-static bool ContainsIgnoreCase(const std::string& text, const std::string& token) {
-    if (token.empty() || text.size() < token.size()) {
-        return false;
-    }
-    auto lower = [](unsigned char c) { return static_cast<char>(std::tolower(c)); };
-    for (size_t i = 0; i + token.size() <= text.size(); ++i) {
-        size_t j = 0;
-        while (j < token.size() && lower(static_cast<unsigned char>(text[i + j])) == lower(static_cast<unsigned char>(token[j]))) {
-            ++j;
-        }
-        if (j == token.size()) {
-            return true;
-        }
-    }
-    return false;
-}
-
 int main(int argc, char** argv) {
     std::string config_path = "config/default.yaml";
     if (argc == 2) {
@@ -73,21 +55,8 @@ int main(int argc, char** argv) {
     }
 
     std::string model_type = cfg.GetString("model.type", "yolo");
-    std::string model_path = cfg.GetString("model.path", "./model/yolov5.rknn");
+    std::string yolo_model_path = cfg.GetString("model.yolo.path", "./model/yolov5.rknn");
     std::string scrfd_model_path = cfg.GetString("model.scrfd.path", "./model/scrfd.rknn");
-    if (model_type == "yolo") {
-        const bool yolo_path_looks_scrfd = ContainsIgnoreCase(model_path, "scrfd");
-        const bool scrfd_path_looks_yolo = ContainsIgnoreCase(scrfd_model_path, "yolo");
-        if (yolo_path_looks_scrfd && scrfd_path_looks_yolo) {
-            LogWarn("Main: model.path/scrfd.path appear swapped, auto-fix yolo='%s' scrfd='%s'",
-                    model_path.c_str(), scrfd_model_path.c_str());
-            std::swap(model_path, scrfd_model_path);
-        } else if (yolo_path_looks_scrfd) {
-            LogWarn("Main: model.path points to SCRFD model ('%s'), force fallback to ./model/yolov5.rknn",
-                    model_path.c_str());
-            model_path = "./model/yolov5.rknn";
-        }
-    }
     float scrfd_conf_th = static_cast<float>(cfg.GetInt("model.scrfd.conf_threshold_percent", 50)) / 100.0f;
     float scrfd_nms_th = static_cast<float>(cfg.GetInt("model.scrfd.nms_threshold_percent", 50)) / 100.0f;
     std::string ppocr_det_path = cfg.GetString("model.ppocr.det_path", "./model/ppocrv4_det.rknn");
@@ -154,7 +123,7 @@ int main(int argc, char** argv) {
         std::unique_ptr<IDisplaySink> display = CreateOpenCVDisplaySink(display_cfg);
 
         Pipeline pipeline(coordinator, camera, frame_transform, overlay, *display,
-                          base_adapter, model_path, infer_threads, npu_cores, single_thread);
+                          base_adapter, yolo_model_path, infer_threads, npu_cores, single_thread);
         pipeline.SetExternalStopFlag(&g_stop_requested);
         pipeline.SetOcrLogIntervalFrames(ocr_log_interval);
 
@@ -183,8 +152,8 @@ int main(int argc, char** argv) {
         }
         pipeline.SetPpocrBackPolicy(auto_back_to_yolo, min_ppocr_frames, back_on_no_text);
 
-        LogInfo("Main: yolo->scrfd on person, ppocr mode='%s', scrfd_model=%s",
-                to_ppocr.c_str(), scrfd_model_path.c_str());
+        LogInfo("Main: yolo=%s scrfd=%s ppocr mode='%s'",
+                yolo_model_path.c_str(), scrfd_model_path.c_str(), to_ppocr.c_str());
 
         pipeline.Run();
     } catch (const std::exception& e) {
