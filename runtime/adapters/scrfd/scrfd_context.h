@@ -1,5 +1,5 @@
 /*
- * adapters/scrfd/scrfd_context.h — SCRFD RKNN 上下文（独立于 YOLO/PPOCR 类型名）
+ * adapters/scrfd/scrfd_context.h — SCRFD RKNN 上下文（独立于 YOLO 类型名）
  */
 #pragma once
 

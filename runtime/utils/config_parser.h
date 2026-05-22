@@ -90,7 +90,12 @@ private:
             return;
         }
 
-        // 解析字符串
+        // 去掉 YAML 引号
+        if (val.size() >= 2 &&
+            ((val.front() == '"' && val.back() == '"') || (val.front() == '\'' && val.back() == '\''))) {
+            val = val.substr(1, val.size() - 2);
+        }
+
         type_ = ConfigType::String;
         str_val_ = val;
     }
@@ -123,28 +128,33 @@ public:
         }
 
         std::vector<ConfigParser*> stack;
+        std::vector<size_t> stack_indent;
         stack.push_back(this);
+        stack_indent.push_back(0);
         std::string line;
 
         while (std::getline(file, line)) {
             std::string trim_line = trim(line);
             if (trim_line.empty() || trim_line[0] == '#') continue;
 
-            // 计算缩进
             size_t indent = 0;
-            while (indent < line.size() && std::isspace(static_cast<unsigned char>(line[indent]))) indent++;
+            while (indent < line.size() && std::isspace(static_cast<unsigned char>(line[indent]))) {
+                indent++;
+            }
             std::string content = line.substr(indent);
 
-            // 分割 key: value
             size_t colon = content.find(':');
-            if (colon == std::string::npos) continue;
+            if (colon == std::string::npos) {
+                continue;
+            }
 
             std::string key = trim(content.substr(0, colon));
             std::string val = trim(content.substr(colon + 1));
 
-            // 调整嵌套层级
-            while (stack.size() > 1 && indent <= (stack.size() - 2) * 4) {
+            // 按真实缩进回退父节点（修复 llm:\n    enabled: true 被挂到 model.enabled）
+            while (stack.size() > 1 && indent <= stack_indent.back()) {
                 stack.pop_back();
+                stack_indent.pop_back();
             }
 
             ConfigParser& child = stack.back()->children_[key];
@@ -152,6 +162,7 @@ public:
                 child.parse_value(val);
             } else {
                 stack.push_back(&child);
+                stack_indent.push_back(indent);
             }
         }
 
@@ -171,6 +182,29 @@ public:
         ConfigParser* node = find_node(key);
         if (!node || node->type_ != ConfigType::Number) return default_val;
         return static_cast<int>(node->num_val_);
+    }
+
+    // 4. 布尔：支持 1/0、true/false（yaml 里 true 常为 String）
+    bool GetBool(const std::string& key, bool default_val = false) {
+        ConfigParser* node = find_node(key);
+        if (!node) {
+            return default_val;
+        }
+        if (node->type_ == ConfigType::Number) {
+            return node->num_val_ != 0.0;
+        }
+        if (node->type_ == ConfigType::String) {
+            std::string s = node->str_val_;
+            std::transform(s.begin(), s.end(), s.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (s == "true" || s == "yes" || s == "on" || s == "1") {
+                return true;
+            }
+            if (s == "false" || s == "no" || s == "off" || s == "0") {
+                return false;
+            }
+        }
+        return default_val;
     }
 
     // -------------- 扩展：获取数组（保留原有功能） --------------

@@ -232,7 +232,11 @@ std::string ScrfdAdapter::Postprocess(const std::shared_ptr<void>& model_output)
         const int y1 = static_cast<int>(f.y1);
         const int x2 = static_cast<int>(f.x2);
         const int y2 = static_cast<int>(f.y2);
-        out << "face " << x1 << " " << y1 << " " << x2 << " " << y2 << " " << f.score << "\n";
+        out << "face " << x1 << " " << y1 << " " << x2 << " " << y2 << " " << f.score;
+        for (int k = 0; k < 5; ++k) {
+            out << " " << static_cast<int>(f.kps[k].x) << " " << static_cast<int>(f.kps[k].y);
+        }
+        out << "\n";
     }
     return out.str();
 }

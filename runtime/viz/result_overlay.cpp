@@ -41,8 +41,8 @@ void ResultOverlay::DrawModelBadge(cv::Mat& frame, const std::string& model_name
     cv::rectangle(frame, cv::Point(pad, pad), cv::Point(pad + ts.width + pad * 2, y0 + baseline + pad),
                   cv::Scalar(0, 0, 0), cv::FILLED);
     cv::Scalar color = cv::Scalar(0, 255, 0);
-    if (model_name.find("ppocr") != std::string::npos) {
-        color = cv::Scalar(0, 255, 255);
+    if (model_name.find("scrfd") != std::string::npos) {
+        color = cv::Scalar(255, 0, 255);
     }
     cv::putText(frame, badge, cv::Point(pad + 4, y0), cv::FONT_HERSHEY_SIMPLEX, scale, color, thick);
 }
@@ -64,37 +64,6 @@ void ResultOverlay::DrawGreetingBanner(cv::Mat& frame, const std::string& text) 
                 thick);
 }
 
-void ResultOverlay::LogOcrResultsToTerminal(const std::string& result_json) {
-    if (result_json.empty()) {
-        LogInfo("[OCR] (no text detected this frame)");
-        return;
-    }
-    std::istringstream ss(result_json);
-    std::string line;
-    int count = 0;
-    while (std::getline(ss, line)) {
-        if (line.compare(0, 4, "OCR ") != 0) {
-            continue;
-        }
-        auto bar = line.find(" |");
-        std::string text = (bar != std::string::npos && bar + 2 < line.size()) ? line.substr(bar + 2) : "";
-        float score = 0.f;
-        std::istringstream ls(line);
-        std::string label;
-        int coords[8];
-        if (!(ls >> label >> coords[0] >> coords[1] >> coords[2] >> coords[3] >> coords[4] >>
-              coords[5] >> coords[6] >> coords[7] >> score)) {
-            continue;
-        }
-        ++count;
-        LogInfo("[OCR #%d] score=%.2f text=\"%s\"", count, score, text.c_str());
-    }
-    if (count == 0) {
-        LogInfo("[OCR] (no text above rec threshold; check lighting/focus or lower model.ppocr.rec_score_threshold)");
-    }
-}
-
-// 将单槽 Postprocess 行文本绘制到帧上；suppress_yolo_person 时跳过 YOLO 的 person 检测行。
 void ResultOverlay::Apply(cv::Mat& frame, const std::string& result_json,
                           bool suppress_yolo_person) const {
     if (frame.empty() || frame.data == nullptr) {
@@ -117,37 +86,6 @@ void ResultOverlay::Apply(cv::Mat& frame, const std::string& result_json,
 
         std::istringstream line_stream(line);
         std::string label;
-        if (line.compare(0, 4, "OCR ") == 0) {
-            int x0, y0, x1, y1, x2, y2, x3, y3;
-            float score = 0.f;
-            line_stream >> label >> x0 >> y0 >> x1 >> y1 >> x2 >> y2 >> x3 >> y3 >> score;
-            if (line_stream.fail()) {
-                continue;
-            }
-            std::string text;
-            auto bar = line.find(" |");
-            if (bar != std::string::npos && bar + 2 < line.size()) {
-                text = line.substr(bar + 2);
-            }
-            auto clamp_pt = [&frame](int x, int y) {
-                return cv::Point(std::max(0, std::min(x, frame.cols - 1)),
-                                 std::max(0, std::min(y, frame.rows - 1)));
-            };
-            cv::Point p0 = clamp_pt(x0, y0);
-            cv::Point p1 = clamp_pt(x1, y1);
-            cv::Point p2 = clamp_pt(x2, y2);
-            cv::Point p3 = clamp_pt(x3, y3);
-            cv::line(frame, p0, p1, cv::Scalar(255, 128, 0), box_thick);
-            cv::line(frame, p1, p2, cv::Scalar(255, 128, 0), box_thick);
-            cv::line(frame, p2, p3, cv::Scalar(255, 128, 0), box_thick);
-            cv::line(frame, p3, p0, cv::Scalar(255, 128, 0), box_thick);
-            if (!text.empty()) {
-                cv::putText(frame, text, p0, cv::FONT_HERSHEY_SIMPLEX, text_scale, cv::Scalar(0, 255, 255),
-                            box_thick);
-            }
-            continue;
-        }
-
         int x1, y1, x2, y2;
         float score;
         if (!(line_stream >> label >> x1 >> y1 >> x2 >> y2 >> score)) {
@@ -166,6 +104,23 @@ void ResultOverlay::Apply(cv::Mat& frame, const std::string& result_json,
         const bool is_face = (label == "face");
         const cv::Scalar box_color = is_face ? cv::Scalar(255, 0, 255) : cv::Scalar(255, 0, 0);
         cv::rectangle(frame, cv::Point(x1, y1), cv::Point(x2, y2), box_color, box_thick);
+
+        if (is_face) {
+            const int kps_radius = std::max(3, box_thick + 1);
+            const cv::Scalar kps_colors[5] = {
+                cv::Scalar(0, 255, 0), cv::Scalar(0, 255, 0), cv::Scalar(0, 255, 255),
+                cv::Scalar(255, 128, 0), cv::Scalar(255, 128, 0)};
+            for (int k = 0; k < 5; ++k) {
+                int kx = 0;
+                int ky = 0;
+                if (!(line_stream >> kx >> ky)) {
+                    break;
+                }
+                kx = std::max(0, std::min(kx, frame.cols - 1));
+                ky = std::max(0, std::min(ky, frame.rows - 1));
+                cv::circle(frame, cv::Point(kx, ky), kps_radius, kps_colors[k], cv::FILLED);
+            }
+        }
 
         std::ostringstream text_stream;
         text_stream << label << " " << static_cast<int>(score * 100) << "%";

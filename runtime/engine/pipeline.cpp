@@ -5,15 +5,16 @@
 #include "platform/logging.h"
 #include <iostream>
 #include <chrono>
+#include <cctype>
+#include <sys/select.h>
+#include <unistd.h>
 
 // 按方案 A 合并本帧各槽 GetAdapterSignals（OR），供 UpdateAfterFrame 去抖。
 AdapterSignals Pipeline::MergeSlotSignals(const std::vector<SlotInferenceResult>& slot_results) {
     AdapterSignals merged;
     for (const auto& r : slot_results) {
         merged.person_present = merged.person_present || r.signals.person_present;
-        merged.text_region_present = merged.text_region_present || r.signals.text_region_present;
         merged.face_detected = merged.face_detected || r.signals.face_detected;
-        merged.text_detected = merged.text_detected || r.signals.text_detected;
         if (r.signals.avg_brightness > 0.0f) {
             merged.avg_brightness = r.signals.avg_brightness;
         }
@@ -24,7 +25,7 @@ AdapterSignals Pipeline::MergeSlotSignals(const std::vector<SlotInferenceResult>
     return merged;
 }
 
-// 对当前 enabled 槽顺序 Preprocess→Inference→Postprocess，再 ProbeTextRegion 补文字信号。
+// 对当前 enabled 槽顺序 Preprocess→Inference→Postprocess。
 bool Pipeline::RunEnabledSlots(ModelCoordinator& coordinator, const cv::Mat& frame,
                                std::vector<SlotInferenceResult>& slot_results,
                                AdapterSignals& merged_signals) {
@@ -52,7 +53,6 @@ bool Pipeline::RunEnabledSlots(ModelCoordinator& coordinator, const cv::Mat& fra
         slot_results.push_back(std::move(one));
     }
     merged_signals = MergeSlotSignals(slot_results);
-    coordinator.ProbeTextRegion(frame, merged_signals);
     return !slot_results.empty();
 }
 
@@ -120,25 +120,12 @@ void Pipeline::RegisterFactory(const std::string& name,
     coordinator_.RegisterFactory(name, std::move(factory), model_path);
 }
 
-void Pipeline::SetSwitchDebounceThresholds(int present_threshold, int absent_threshold,
-                                           int text_absent_threshold) {
-    coordinator_.SetSwitchDebounceThresholds(present_threshold, absent_threshold, text_absent_threshold);
-}
-
-void Pipeline::SetToPpocrMode(const std::string& mode) {
-    coordinator_.SetToPpocrMode(mode);
-}
-
-void Pipeline::SetPpocrBackPolicy(bool auto_back_to_yolo, int min_ppocr_frames, bool back_on_no_text) {
-    coordinator_.SetPpocrBackPolicy(auto_back_to_yolo, min_ppocr_frames, back_on_no_text);
+void Pipeline::SetSwitchDebounceThresholds(int present_threshold, int absent_threshold) {
+    coordinator_.SetSwitchDebounceThresholds(present_threshold, absent_threshold);
 }
 
 void Pipeline::SetExternalStopFlag(std::atomic<bool>* flag) {
     external_stop_ = flag;
-}
-
-void Pipeline::SetOcrLogIntervalFrames(int interval) {
-    ocr_log_interval_frames_ = interval > 0 ? interval : 30;
 }
 
 // 排空后处理队列，便于 Stop 时投递 quit 哨兵。
@@ -206,6 +193,7 @@ void Pipeline::Stop() {
 // 主入口：单线程直连显示，或多线程 pre→infer→主线程 post/显示。
 void Pipeline::Run() {
     LogInfo("Pipeline::Run: begin (infer_threads=%d)", num_infer_threads_);
+    LogInfo("Pipeline: terminal input enabled, type prompt in terminal and press Enter to talk");
     display_.Prepare();
     LogInfo("Pipeline::Run: display prepared");
 
@@ -229,6 +217,7 @@ void Pipeline::Run() {
 void Pipeline::RunSingleThreaded() {
     int frame_id = 0;
     while (!ShouldStop()) {
+        PollTerminalPromptInput();
         cv::Mat frame;
         if (!camera_.ReadFrame(frame, &stop_)) {
             if (ShouldStop() || !camera_.IsOpened()) {
@@ -271,26 +260,6 @@ bool Pipeline::ProcessDisplayTask(InferenceTask& task) {
     if (badge != last_display_badge_) {
         LogInfo("Pipeline: enabled slots -> %s (frame_id=%d)", badge.c_str(), task.frame_id);
         last_display_badge_ = badge;
-        frames_since_ocr_log_ = ocr_log_interval_frames_;
-    }
-    bool has_ppocr_layer = false;
-    for (const auto& layer : task.slot_results) {
-        if (layer.slot == "ppocr") {
-            has_ppocr_layer = true;
-            break;
-        }
-    }
-    if (has_ppocr_layer) {
-        ++frames_since_ocr_log_;
-        if (frames_since_ocr_log_ >= ocr_log_interval_frames_) {
-            frames_since_ocr_log_ = 0;
-            for (const auto& layer : task.slot_results) {
-                if (layer.slot == "ppocr") {
-                    ResultOverlay::LogOcrResultsToTerminal(layer.result_json);
-                    break;
-                }
-            }
-        }
     }
 
     const bool suppress_yolo_person = coordinator_.ShouldSuppressYoloPersonDraw();
@@ -299,15 +268,14 @@ bool Pipeline::ProcessDisplayTask(InferenceTask& task) {
         overlay_.Apply(task.original_frame, layer.result_json, suppress);
     }
     overlay_.DrawModelBadge(task.original_frame, badge);
-    if (coordinator_.GetLlmGreeting().HasBanner()) {
-        overlay_.DrawGreetingBanner(task.original_frame, coordinator_.GetLlmGreeting().GetBannerLine());
-    }
 
     cv::Mat display = task.original_frame.isContinuous() ? task.original_frame : task.original_frame.clone();
     display_.Show(display);
-    if (display_.PollKey(1) == 27) {
+    const int key = display_.PollKey(1);
+    if (key == 27) {
         Stop();
     }
+    PollTerminalPromptInput();
 
     const uint64_t count = ++processed_frames_;
     if (count == 1) {
@@ -332,6 +300,65 @@ bool Pipeline::ProcessDisplayTask(InferenceTask& task) {
                 (unsigned long)count, coordinator_.GetEnabledSlotsBadge().c_str(), fps);
     }
     return true;
+}
+
+void Pipeline::PollTerminalPromptInput() {
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(STDIN_FILENO, &rfds);
+    timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    const int ret = select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv);
+    if (ret <= 0 || !FD_ISSET(STDIN_FILENO, &rfds)) {
+        return;
+    }
+
+    char ch = '\0';
+    const ssize_t n = ::read(STDIN_FILENO, &ch, 1);
+    if (n <= 0) {
+        return;
+    }
+
+    if (ch == '\r' || ch == '\n') {
+        std::string line = terminal_input_buffer_;
+        terminal_input_buffer_.clear();
+        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
+            line.pop_back();
+        }
+        size_t start = 0;
+        while (start < line.size() &&
+               std::isspace(static_cast<unsigned char>(line[start]))) {
+            ++start;
+        }
+        if (start > 0) {
+            line.erase(0, start);
+        }
+        if (line.empty()) {
+            return;
+        }
+
+        const bool accepted = coordinator_.GetLlmGreeting().SubmitUserPrompt(line);
+        if (accepted) {
+            LogInfo("Pipeline: terminal prompt submitted (%zu chars)", line.size());
+        } else {
+            LogInfo("Pipeline: terminal prompt rejected (gate closed)");
+        }
+        return;
+    }
+
+    // 串口常见退格字符（BS/DEL）
+    if (ch == '\b' || static_cast<unsigned char>(ch) == 0x7f) {
+        if (!terminal_input_buffer_.empty()) {
+            terminal_input_buffer_.pop_back();
+        }
+        return;
+    }
+
+    if (std::isprint(static_cast<unsigned char>(ch)) != 0 || ch == '\t') {
+        terminal_input_buffer_.push_back(ch);
+    }
 }
 
 // 预处理线程：读帧变换后 push 到 infer_queue[0]，满则丢帧。
@@ -402,6 +429,7 @@ void Pipeline::RunPostprocessOnMainThread() {
     LogInfo("Pipeline::RunPostprocessOnMainThread: entered (main thread display)");
     const int kPopTimeoutMs = 200;
     while (!ShouldStop()) {
+        PollTerminalPromptInput();
         InferenceTask task;
         if (!post_queue_.TryPop(task, kPopTimeoutMs)) {
             continue;

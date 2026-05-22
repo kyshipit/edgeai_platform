@@ -1,7 +1,7 @@
 /*
  * engine/pipeline.h
  *
- * 【engine 层】调度内核：队列、线程池、任务流转；不含摄像头/画框/热切换策略实现。
+ * 【engine 层】调度内核：队列、线程池、任务流转。
  */
 #pragma once
 #include <atomic>
@@ -9,6 +9,7 @@
 #include <future>
 #include <functional>
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
 #include <opencv2/opencv.hpp>
@@ -57,12 +58,8 @@ public:
     void RegisterFactory(const std::string& name,
                          std::function<std::shared_ptr<IModelAdapter>()> factory,
                          const std::string& model_path);
-    void SetSwitchDebounceThresholds(int present_threshold, int absent_threshold,
-                                     int text_absent_threshold = 30);
-    void SetToPpocrMode(const std::string& mode);
-    void SetPpocrBackPolicy(bool auto_back_to_yolo, int min_ppocr_frames, bool back_on_no_text);
+    void SetSwitchDebounceThresholds(int present_threshold, int absent_threshold);
     void SetExternalStopFlag(std::atomic<bool>* flag);
-    void SetOcrLogIntervalFrames(int interval);
 
 private:
     bool ShouldStop() const;
@@ -75,6 +72,7 @@ private:
     void DrainPostQueue();
     void DrainInferQueues();
     void PushQuitTasksBestEffort();
+    void PollTerminalPromptInput();
 
     ModelCoordinator& coordinator_;
     CameraSource& camera_;
@@ -97,9 +95,8 @@ private:
     std::atomic<uint64_t> processed_frames_{0};
     bool single_thread_ = false;
     std::chrono::steady_clock::time_point start_time_;
-    int ocr_log_interval_frames_ = 30;
     std::string last_display_badge_;
-    int frames_since_ocr_log_ = 0;
+    std::string terminal_input_buffer_;
 
     static AdapterSignals MergeSlotSignals(const std::vector<SlotInferenceResult>& slot_results);
     static bool RunEnabledSlots(ModelCoordinator& coordinator, const cv::Mat& frame,

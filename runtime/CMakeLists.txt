@@ -39,11 +39,6 @@ set(RUNTIME_SRC
     adapters/yolo/yolo_postprocess.cpp
     adapters/scrfd/scrfd_adapter.cpp
     adapters/scrfd/scrfd_postprocess.cpp
-    adapters/ppocr/ppocr_adapter.cpp
-    adapters/ppocr/text_region_probe.cpp
-    adapters/ppocr/ppocr_system.cc
-    adapters/ppocr/postprocess.cc
-    adapters/ppocr/clipper.cc
     adapters/llm/rkllm_session.cpp
     adapters/llm/llm_worker.cpp
 )
@@ -68,7 +63,6 @@ target_include_directories(edgeai_platform_demo PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/adapters/yolo
     ${CMAKE_CURRENT_SOURCE_DIR}/adapters/scrfd
-    ${CMAKE_CURRENT_SOURCE_DIR}/adapters/ppocr
     ${CMAKE_CURRENT_SOURCE_DIR}/adapters/llm
     ${RKLLM_API_DIR}/include
     ${LIBRKNNRT_INCLUDES}
@@ -78,7 +72,7 @@ install(TARGETS edgeai_platform_demo DESTINATION .)
 install(FILES ${LIBRKNNRT} DESTINATION lib)
 install(FILES ${LIBRKLLMRT} ${LIBGOMP} DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/coco_80_labels_list.txt DESTINATION ./model)
-file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
-install(FILES ${RKNN_FILES} DESTINATION model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/yolov5.rknn DESTINATION model OPTIONAL)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/scrfd.rknn DESTINATION model OPTIONAL)
 file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/*.yaml")
 install(FILES ${CONFIG_FILES} DESTINATION config)

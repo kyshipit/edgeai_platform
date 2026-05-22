@@ -8,44 +8,27 @@ model:
     path: ./model/scrfd.rknn
     conf_threshold_percent: 50
     nms_threshold_percent: 50
-  ppocr:
-    det_path: ./model/ppocrv4_det.rknn
-    rec_path: ./model/ppocrv4_rec.rknn
-    det_threshold_percent: 40
-    box_threshold_percent: 60
-    rec_score_threshold_percent: 35
-    # 证件 OCR 可略降；竖屏 1080 宽时 720 比 960 更利于小字
-    min_infer_width: 720
   llm:
-    # 默认关闭以免无模型时 Init 失败
     enabled: true
     path: ./model/deepseek-1.5b-w8a8-rk3588.rkllm
     max_new_tokens: 64
     max_context_len: 4096
-    face_stable_frames: 1
+    preload_on_startup: true
+    preload_on_scrfd: true
+    face_stable_frames: 5
+    face_absent_frames: 10
     greeting_prompt: "请用一句简短、自然的中文向镜头前的人问好，不要超过二十个字。"
+    reenter_prompt: "欢迎回来，请用一句简短中文向镜头前的人问好。"
+    auto_greeting_text: "您好，我是deepseek, 有什么需要可以直接和我对话"
 system:
   infer_threads: 1
-  npu_cores: [0, 1, 2]
+  npu_cores: [0, 1]
   slots:
     yolo_always_on: true
-    # document 场景（文字+人，如身份证）关闭 yolo，让路 scrfd+ppocr
-    document_disable_yolo: true
-    # 场景稳定 N 帧后才切换槽，减轻抖动与 RKNN 反复加载
     scene_dwell_frames: 8
-    text_probe_interval: 1
-    # 文字区探测用较小缩放宽，减少证件小字被拉糊
-    text_probe_min_infer_width: 640
   switch:
-    present_threshold: 10
+    present_threshold: 30
     absent_threshold: 30
-    text_absent_threshold: 150
-    # person 稳定 -> scrfd（人脸）；非 ppocr
-    # to_ppocr: text=需 text_region_present；frames=联调；off=不自动切 OCR
-    to_ppocr: text
-    auto_back_to_yolo: true
-    back_to_yolo_on: no_text
-    min_ppocr_frames: 90
     single_thread: false
 input:
   source: /dev/video-camera0
@@ -59,4 +42,3 @@ input:
     max_screen_ratio_percent: 85
     fullscreen: false
     title_bar_reserve_px: 56
-  log_ocr_interval_frames: 30
