@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目文档</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: system-ui, sans-serif; 
+      max-width: 900px; 
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+    .lang-switch {
+      margin-bottom: 2rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .lang-switch button {
+      padding: 0.5rem 1.2rem;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .lang-switch button.active {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    #content {
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="lang-switch">
+  <button id="btn-zh">中文</button>
+  <button id="btn-en">English</button>
+</div>
+<div id="content"></div>
+
+<script>
+  const btnZh = document.getElementById('btn-zh');
+  const btnEn = document.getElementById('btn-en');
+  const content = document.getElementById('content');
+
+  async function loadDoc(lang) {
+    const file = lang === 'zh' ? 'README.cn.md' : 'README.en.md';
+    try {
+      const res = await fetch(file);
+      if (!res.ok) throw new Error(`Failed to load ${file}`);
+      const text = await res.text();
+      content.innerHTML = marked.parse(text);
+    } catch (err) {
+      content.innerHTML = `<p style="color:red;">加载失败：${err.message}</p>`;
+    }
+  }
+
+  function switchTo(lang) {
+    loadDoc(lang);
+    btnZh.classList.toggle('active', lang === 'zh');
+    btnEn.classList.toggle('active', lang === 'en');
+    localStorage.setItem('lang', lang);
+  }
+
+  btnZh.addEventListener('click', () => switchTo('zh'));
+  btnEn.addEventListener('click', () => switchTo('en'));
+
+  const saved = localStorage.getItem('lang') || 'en';
+  switchTo(saved);
+</script>
+</body>
+</html>
