@@ -1,4 +1,4 @@
-🌐 Language: **English** | [中文](assets/README.cn.md)
+🌐 Language: **English** | [中文](README.cn.md)
 
 # RK3588 Edge AI Inference Platform
 
