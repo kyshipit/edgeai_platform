@@ -197,7 +197,7 @@ void Pipeline::Stop() {
 // 主入口：单线程直连显示，或多线程 pre→infer→主线程 post/显示。
 void Pipeline::Run() {
     LogInfo("Pipeline::Run: begin (infer_threads=%d)", num_infer_threads_);
-    LogSystem("输入通道已就绪，输入并回车提交（是否受理取决于人脸门控）");
+    coordinator_.GetLlmGreeting().LogStartupHint();
     if (!::isatty(STDIN_FILENO)) {
         LogWarn("Pipeline: stdin is not a TTY, YOU> input may be unavailable");
     } else {

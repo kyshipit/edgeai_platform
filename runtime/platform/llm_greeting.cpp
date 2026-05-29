@@ -37,6 +37,7 @@ void LlmGreeting::Reset() {
     face_absent_count_ = 0;
     prompt_gate_open_ = false;
     gate_reject_notified_ = false;
+    dialogue_unavailable_notified_ = false;
     auto_prompt_sent_for_visit_ = false;
     had_face_leave_since_boot_ = false;
     scrfd_was_active_ = false;
@@ -185,11 +186,52 @@ void LlmGreeting::PollDeferred() {
     if (tts_) {
         tts_->PollInitState();
     }
+    TryOpenDialogueIfReady();
 }
 
-// 按配置尝试预加载模型；仅在未 ready 且未 initializing 时触发一次请求。
+// Pipeline 启动时打印一条与 LLM 状态一致的 SYS 提示。
+void LlmGreeting::LogStartupHint() {
+    PollDeferred();
+    if (!worker_) {
+        return;
+    }
+    if (worker_->IsLoadFailed()) {
+        return;
+    }
+    if (worker_->IsReady()) {
+        LogSystem("输入通道已就绪，人脸稳定后可对话");
+        return;
+    }
+    LogSystem("对话模型加载中，请稍候");
+}
+
+// 模型刚就绪且人脸已稳定时打开输入门控并补发静态问候。
+void LlmGreeting::TryOpenDialogueIfReady() {
+    if (!worker_ || !worker_->IsReady()) {
+        return;
+    }
+    if (state_ != SessionState::Active && state_ != SessionState::Grace) {
+        return;
+    }
+    if (face_stable_count_ < trigger_threshold_) {
+        return;
+    }
+    if (!prompt_gate_open_) {
+        prompt_gate_open_ = true;
+        gate_reject_notified_ = false;
+        dialogue_unavailable_notified_ = false;
+    }
+    AdapterSignals signals;
+    signals.face_detected = true;
+    TryAutoPromptOnStableFace(signals);
+}
+
+// 按配置尝试预加载模型；仅在未 ready、未 initializing 且未永久失败时触发。
 void LlmGreeting::TryPreload() {
     if (!worker_ || !preload_on_scrfd_) {
+        return;
+    }
+    if (worker_->IsLoadFailed()) {
         return;
     }
     if (!worker_->IsReady() && !worker_->IsInitializing()) {
@@ -198,8 +240,11 @@ void LlmGreeting::TryPreload() {
     }
 }
 
-// 当人脸稳定达到阈值时自动打一条欢迎语（每次“到访”仅一次）。
+// 当人脸稳定且对话模型就绪时自动打一条欢迎语（每次“到访”仅一次）。
 void LlmGreeting::TryAutoPromptOnStableFace(const AdapterSignals& signals) {
+    if (!worker_ || !worker_->IsReady()) {
+        return;
+    }
     if (!signals.face_detected || face_stable_count_ < trigger_threshold_) {
         return;
     }
@@ -210,11 +255,10 @@ void LlmGreeting::TryAutoPromptOnStableFace(const AdapterSignals& signals) {
         return;
     }
     // 有正在进行的流式回复时不插入自动问候，避免与用户对话输出相互打断。
-    if (worker_ && worker_->IsBusy()) {
+    if (worker_->IsBusy()) {
         return;
     }
 
-    prompt_gate_open_ = true;
     const bool reenter = had_face_leave_since_boot_;
     const LlmPromptSource src =
         reenter ? LlmPromptSource::FaceReenter : LlmPromptSource::FaceAppear;
@@ -223,9 +267,16 @@ void LlmGreeting::TryAutoPromptOnStableFace(const AdapterSignals& signals) {
     LogInfo("LlmGreeting: auto greeting emitted (%s)", reenter ? "reenter" : "appear");
 }
 
-// 接收用户文本：门控关闭时拒绝，并做一次性提示防刷屏。
+// 接收用户文本：门控关闭或模型不可用时拒绝，并做一次性提示防刷屏。
 bool LlmGreeting::SubmitUserPrompt(const std::string& text) {
     if (!worker_ || text.empty()) {
+        return false;
+    }
+    if (worker_->IsLoadFailed()) {
+        if (!dialogue_unavailable_notified_) {
+            LogSystem("对话不可用（模型未加载）");
+            dialogue_unavailable_notified_ = true;
+        }
         return false;
     }
     if (!prompt_gate_open_) {
@@ -287,7 +338,7 @@ void LlmGreeting::Update(const AdapterSignals& signals, bool scrfd_slot_active) 
         face_absent_count_++;
     }
 
-    if (worker_ && scrfd_slot_active && !worker_->IsReady()) {
+    if (worker_ && scrfd_slot_active && !worker_->IsReady() && !worker_->IsLoadFailed()) {
         worker_->RequestInitializeAsync();
     }
 
@@ -315,8 +366,9 @@ void LlmGreeting::Update(const AdapterSignals& signals, bool scrfd_slot_active) 
         if (face_stable_count_ >= trigger_threshold_) {
             const SessionState prev = state_;
             state_ = SessionState::Active;
-            prompt_gate_open_ = true;
+            prompt_gate_open_ = worker_ && worker_->IsReady();
             gate_reject_notified_ = false;
+            dialogue_unavailable_notified_ = false;
             auto_prompt_sent_for_visit_ = false;
             last_activity_ts_ = now;
             LogDebug("LlmGreeting: state %s -> %s", StateName(prev), StateName(state_));
@@ -341,10 +393,12 @@ void LlmGreeting::Update(const AdapterSignals& signals, bool scrfd_slot_active) 
         if (face_stable_count_ >= trigger_threshold_) {
             const SessionState prev = state_;
             state_ = SessionState::Active;
+            prompt_gate_open_ = worker_ && worker_->IsReady();
             face_absent_count_ = 0;
             last_activity_ts_ = now;
             LogDebug("LlmGreeting: state %s -> %s (face recovered)",
                      StateName(prev), StateName(state_));
+            TryAutoPromptOnStableFace(signals);
             return;
         }
         if (grace_deadline_ != std::chrono::steady_clock::time_point{} && now >= grace_deadline_) {

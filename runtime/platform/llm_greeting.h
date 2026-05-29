@@ -43,6 +43,9 @@ public:
     // 进程退出或 Pipeline::Stop 时中断正在进行的生成。
     void AbortActiveGeneration();
 
+    // Pipeline 启动时按 LLM 状态打印一条 SYS 提示（避免与仅视觉/加载中矛盾）。
+    void LogStartupHint();
+
     // 统一处理 AI 文本输出（支持单行连续流式）。
     void SetBannerLine(const std::string& line, LlmPromptSource src, bool is_final = true);
 
@@ -57,6 +60,7 @@ private:
     static const char* StateName(SessionState state);
     void TryPreload();
     void TryAutoPromptOnStableFace(const AdapterSignals& signals);
+    void TryOpenDialogueIfReady();
     static const char* SourceName(LlmPromptSource src);
 
     LlmWorker* worker_ = nullptr;
@@ -72,6 +76,7 @@ private:
     bool preload_on_scrfd_ = true;
     bool prompt_gate_open_ = false;
     bool gate_reject_notified_ = false;
+    bool dialogue_unavailable_notified_ = false;
     bool auto_prompt_sent_for_visit_ = false;
     bool had_face_leave_since_boot_ = false;
     bool scrfd_was_active_ = false;

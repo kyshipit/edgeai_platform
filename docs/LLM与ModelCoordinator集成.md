@@ -100,8 +100,8 @@ flowchart TB
 | 文件 | 角色 |
 |------|------|
 | `rkllm_session.cpp` | 唯一调用 `rkllm_*`；`RunPromptSync`；回调直写 stdout |
-| `llm_worker.cpp` | 异步 `rkllm_init`；`infer_thread_`；`SubmitPrompt` 排队 |
-| `llm_greeting.cpp` | Locked/Arming/Active/Grace；门控；静态问候 |
+| `llm_worker.cpp` | 异步 `rkllm_init`（**先 stat 预检**）；`IsLoadFailed`；`infer_thread_`；`SubmitPrompt` 排队 |
+| `llm_greeting.cpp` | Locked/Arming/Active/Grace；门控；静态问候；**仅视觉降级** UX |
 | `model_coordinator.cpp` | 视觉槽；每帧 `PollDeferred` |
 | `pipeline.cpp` | 终端 `YOU>` |
 
@@ -118,7 +118,20 @@ flowchart TB
 | `SYS>` | 系统提示 | `LogSystem` → stdout |
 | `YOU>` | 用户输入 | `Pipeline::PollTerminalPromptInput` |
 | `AI>` | **用户对话** | `RunPromptNow` 打印前缀 + `StaticCallback` 流式 |
-| `AI>` | **自动问候** | `SetBannerLine` 一次性输出配置文案 |
+| `AI>` | **自动问候** | `SetBannerLine` 一次性输出配置文案（**仅 `IsReady()`**） |
+
+**`SYS>` 与 LLM 状态（`model.llm.enabled=true`）**
+
+| 时机 | 文案 |
+|------|------|
+| 缺文件 / `rkllm_init` 失败 | `仅视觉模式（对话模型未加载）` |
+| `Pipeline::Run` 且加载中 | `对话模型加载中，请稍候` |
+| `Pipeline::Run` 且已 Ready | `输入通道已就绪，人脸稳定后可对话` |
+| 异步 init 成功（`PollInitState`） | `对话模型已就绪，人脸稳定后可输入` |
+| `YOU>` 但 `IsLoadFailed` | `对话不可用（模型未加载）`（每会话一次） |
+| 门控关（无人脸） | `当前未检测到稳定人脸，暂不接收对话输入` |
+
+`Failed` 时 **不重复** 打启动类 `SYS>`（预检/init 失败已提示一次）。
 
 - 用户对话 **不** 经 `SetBannerLine` 流式转发（`OnLlmChunk` 不处理 NORMAL）。
 - `LLM_OUT|...` 为 `SetBannerLine` 在 `is_final` 时的 Debug 汇总（问候等）。
@@ -133,7 +146,8 @@ flowchart TB
 | 场景 | 行为 |
 |------|------|
 | **正在生成** | 说完当前句；脸消失/Grace **不** `rkllm_abort` |
-| **人脸稳定（首次/再现）** | 输出 **`auto_greeting_text`**（`SetBannerLine`）；再现时 `FaceReenter` 仅影响日志 source，文案同配置一句 |
+| **人脸稳定（首次/再现）** | **`IsReady()`** 时输出 **`auto_greeting_text`**（`SetBannerLine`）；再现时 `FaceReenter` 仅影响日志 source |
+| **缺 `.rkllm` / 加载失败** | **仅视觉**：无 `AI>` 问候；`prompt_gate` 不开放；视觉照常 |
 | **人脸持续在** | 不自动多轮；等待用户 **终端**（麦克风源已接）或日后按键 |
 | **人脸消失** | 关 `prompt_gate`；`DropQueuedPrompts`；当前 RKLLM 句仍播完 |
 | **进程退出** | `Pipeline::Stop` → `AbortActiveGeneration` → `Shutdown` / `rkllm_destroy` |
@@ -142,9 +156,11 @@ flowchart TB
 
 | 事件 | 动作 |
 |------|------|
-| 首次需要 LLM | `RequestInitializeAsync` → `rkllm_init`（`preload_on_startup` / `preload_on_scrfd`） |
+| 首次需要 LLM | `RequestInitializeAsync`：**stat 通过**后 `rkllm_init`（`preload_on_startup` / `preload_on_scrfd`）；缺文件 → `Failed`，不调 `rkllm_init` |
+| 加载失败（`Failed`） | `IsLoadFailed()`；本进程内不再 `RequestInitializeAsync`；仅视觉 UX |
 | 人脸消失 / Grace 超时 / 空闲超时 | 关门控、清排队；**不** 卸载模型 |
-| 人脸再次稳定 | 开门控；可再发静态问候（新一次到访） |
+| 人脸再次稳定 | **`IsReady()`** 时开门控；可再发静态问候（新一次到访） |
+| 模型加载完成（`PollDeferred`） | `TryOpenDialogueIfReady`：补开门控与问候 |
 | 进程退出 | `LlmWorker::Shutdown` |
 
 ### 6.3 明确不做
@@ -168,7 +184,9 @@ stateDiagram-v2
     Active --> Locked: idle超时
 ```
 
-`LlmWorker` 侧：`NotReady → Initializing → Ready`；`Ready ↔ Generating`（`infer_thread_` 上 `rkllm_run`）。
+`LlmWorker` 侧：`Uninitialized → Initializing → Ready` 或 **`Failed`**（缺文件 / `rkllm_init` 失败）；`Ready ↔ Generating`（`infer_thread_` 上 `rkllm_run`）。
+
+`prompt_gate_open_` 仅在 **`LlmWorker::IsReady()`** 时因人脸稳定打开；`Active` 会话态与「可对话」分离（Failed 时可有脸框但不可输入）。
 
 ### 6.5 与 SCRFD
 
@@ -226,10 +244,14 @@ model:
 
 | 日志 | 含义 |
 |------|------|
-| `LlmWorker: async InitOnce start` | 开始加载 `.rkllm` |
+| `LlmWorker: model file missing or unreadable, skip rkllm_init` | stat 预检失败，进入仅视觉 |
+| `SYS> 仅视觉模式（对话模型未加载）` | 缺文件或 init 失败后的用户提示 |
+| `LlmWorker: async InitOnce start` | stat 通过，开始加载 `.rkllm` |
 | `LlmWorker: rkllm_init ok` | 成功，不应重复 init |
-| `LlmGreeting: auto greeting emitted` | 静态问候已输出 |
+| `SYS> 对话模型已就绪，人脸稳定后可输入` | 异步 init 成功 |
+| `LlmGreeting: auto greeting emitted` | 静态问候已输出（须 Ready） |
 | `LlmGreeting: reject input gate_open=0` | 门控拒绝（Debug） |
+| `SYS> 对话不可用（模型未加载）` | `YOU>` 在 Failed 时被拒 |
 | `LlmGreeting: state ... -> ...` | 会话状态迁移（多为 Debug） |
 | 终端 `YOU>` / `AI>` | 用户输入 / RKLLM 或静态问候 |
 | `LlmWorker: queued one prompt (busy)` | busy 时保留一句排队 |
@@ -246,7 +268,8 @@ model:
 2. `model.llm.enabled: true`。
 3. `cd runtime && ./build-linux.sh`。
 4. `cd install/rk3588_linux_aarch64/rknn_edgeai_platform && ./edgeai_platform_app config/default.yaml`。
-5. 预期：`scene -> person` → 槽含 `scrfd` → `rkllm_init ok`（一次）→ 人脸稳定 → 静态 `AI>` 问候 → `YOU>` → 流式 `AI>`。
+5. 预期（模型就绪）：`scene -> person` → 槽含 `scrfd` → `rkllm_init ok`（一次）→ 人脸稳定 → 静态 `AI>` 问候 → `YOU>` → 流式 `AI>`。
+6. 缺 `.rkllm`：`SYS> 仅视觉模式（对话模型未加载）`；视觉正常；无 `AI>` 问候；`YOU>` 提示对话不可用。
 
 ---
 
@@ -261,4 +284,4 @@ model:
 
 ---
 
-*文档版本：2026-05-26；对齐 `LlmWorker` / `LlmGreeting` / `rkllm_run` 同步热路径；移除已删除 demo 与 `chat_quiet` 等待办。*
+*文档版本：2026-05-28；对齐 `LlmWorker` stat 预检、仅视觉降级 UX、`LogStartupHint`。*

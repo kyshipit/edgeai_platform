@@ -34,9 +34,16 @@
 
 - 9 路输出索引与后处理布局不符 → 同上专文 §4.4
 
+**缺 `.rkllm` 或对话模型加载失败**
+
+- 视觉（YOLO/SCRFD）应正常；`LlmWorker` 在 `RequestInitializeAsync` 内 **stat 预检**，缺失则 **跳过 `rkllm_init`**，进入仅视觉降级。
+- 终端：`SYS> 仅视觉模式（对话模型未加载）`；**不应**再出现「输入通道已就绪」或静态 `AI>` 问候。
+- 用户仍输入时：`SYS> 对话不可用（模型未加载）`（每会话提示一次）。
+- 详见 [系统架构与运行逻辑.md](系统架构与运行逻辑.md) §5、§8、[LLM与ModelCoordinator集成.md](LLM与ModelCoordinator集成.md) §5–§6。
+
 **缺 `.rkllm` 却报 YOLO Init 失败**
 
-- 多为 LLM 预加载与视觉争 NPU；`LlmWorker` 应对缺失文件 stat 预检。见 [系统架构与运行逻辑.md](系统架构与运行逻辑.md) §3、§5
+- 若仍出现：先确认 YOLO 路径/模型本身（`ls ./model/yolov5.rknn`、勿与 scrfd 混用）；预检生效后不应再因 `rkllm_init` 拖垮 YOLO。见 [YOLO与SCRFD问题排查记录.md](YOLO与SCRFD问题排查记录.md)
 
 **Ctrl+C 不退出**
 

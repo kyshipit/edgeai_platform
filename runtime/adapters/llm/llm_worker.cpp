@@ -5,9 +5,26 @@
 
 #include <chrono>
 #include <cstdio>
+#include <sys/stat.h>
 
 #include "adapters/tts/tts_worker.h"
 #include "platform/logging.h"
+
+namespace {
+
+// 启动预检：缺失或非普通文件时不进入 rkllm_init，避免占 NPU 并误导后续 YOLO Init 日志。
+bool LlmModelFileReadable(const std::string& path) {
+    if (path.empty()) {
+        return false;
+    }
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) {
+        return false;
+    }
+    return S_ISREG(st.st_mode);
+}
+
+}  // namespace
 
 LlmWorker::LlmWorker() = default;
 
@@ -46,7 +63,7 @@ bool LlmWorker::EnsureInitialized() {
     return false;
 }
 
-// 请求异步初始化（幂等）：未配置/已 ready/正在 init 时均直接返回。
+// 请求异步初始化（幂等）：未配置/已 ready/正在 init/已失败时均直接返回；缺文件不调 rkllm_init。
 void LlmWorker::RequestInitializeAsync() {
     std::string path;
     int max_new = 0;
@@ -60,9 +77,31 @@ void LlmWorker::RequestInitializeAsync() {
         if (IsReadyUnlocked() || IsInitializingUnlocked()) {
             return;
         }
+        if (init_state_ == InitState::Failed) {
+            return;
+        }
         path = model_path_;
         max_new = max_new_tokens_;
         max_ctx = max_context_len_;
+    }
+
+    if (!LlmModelFileReadable(path)) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (IsReadyUnlocked() || IsInitializingUnlocked()) {
+            return;
+        }
+        init_state_ = InitState::Failed;
+        LogWarn("LlmWorker: model file lost and failed to load, skip rkllm_init path=%s",
+                path.c_str());
+        LogSystem("仅视觉模式（对话模型未加载）");
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (IsReadyUnlocked() || IsInitializingUnlocked()) {
+            return;
+        }
         init_state_ = InitState::Initializing;
     }
 
@@ -109,6 +148,12 @@ bool LlmWorker::IsInitializing() const {
     return IsInitializingUnlocked();
 }
 
+// 查询是否已判定加载失败（缺文件或 rkllm_init 失败，本进程内不重试）。
+bool LlmWorker::IsLoadFailed() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return IsLoadFailedUnlocked();
+}
+
 // 锁内 ready 判定。
 bool LlmWorker::IsReadyUnlocked() const {
     return init_state_ == InitState::Ready;
@@ -117,6 +162,11 @@ bool LlmWorker::IsReadyUnlocked() const {
 // 锁内 initializing 判定。
 bool LlmWorker::IsInitializingUnlocked() const {
     return init_state_ == InitState::Initializing;
+}
+
+// 锁内 failed 判定。
+bool LlmWorker::IsLoadFailedUnlocked() const {
+    return init_state_ == InitState::Failed;
 }
 
 // 清空所有待处理内容（包括当前已聚合但未发布的 banner）。
@@ -228,11 +278,11 @@ void LlmWorker::PollInitState() {
     if (ret == 0) {
         init_state_ = InitState::Ready;
         LogInfo("LlmWorker: rkllm_init ok (async, model stays loaded until process exit)");
-        LogSystem("模型就绪，检测到稳定人脸后可对话");
+        LogSystem("对话模型已就绪，人脸稳定后可输入");
     } else {
         init_state_ = InitState::Failed;
         LogWarn("LlmWorker: rkllm_init failed (async ret=%d)", ret);
-        LogSystem("模型加载失败，当前仅保留视觉能力");
+        LogSystem("仅视觉模式（对话模型未加载）");
     }
 }
 
@@ -300,6 +350,12 @@ bool LlmWorker::SubmitPrompt(const std::string& user_text, LlmPromptSource src, 
     }
     if (tts_) {
         tts_->Cancel();
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (IsLoadFailedUnlocked()) {
+            return false;
+        }
     }
     if (RunPromptNow(user_text, src)) {
         return true;

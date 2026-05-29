@@ -6,7 +6,7 @@
 
 在 RK3588 Edge AI Runtime（`edgeai_platform_app`）上，将终端 **`AI>` 助手话术** 合成为语音并播放（**已集成** MeloTTS）：
 
-- **静态自动问候**（yaml `auto_greeting_text`，经 `SetBannerLine` 上屏）
+- **静态自动问候**（yaml `auto_greeting_text`，经 `SetBannerLine` 上屏；**仅 LLM `IsReady()`** 时输出，缺 `.rkllm` 不播）
 - **`YOU>` 后 RKLLM 整轮回复**（`reply_accumulator` 与 stdout 同源，**FINISH 后**整段播报）
 
 不播报：`SYS>`、用户输入、视觉检测日志等。

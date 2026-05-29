@@ -60,6 +60,7 @@ public:
     // 状态查询接口。
     bool IsReady() const;
     bool IsInitializing() const;
+    bool IsLoadFailed() const;
     bool IsBusy() const;
 
 private:
@@ -69,6 +70,7 @@ private:
     static const char* SourceName(LlmPromptSource src);
     bool IsReadyUnlocked() const;
     bool IsInitializingUnlocked() const;
+    bool IsLoadFailedUnlocked() const;
     void PollInitState();
     void JoinInferThread();
 
