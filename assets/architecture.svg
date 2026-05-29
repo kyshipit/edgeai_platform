@@ -21,46 +21,62 @@
   <rect x="24" y="118" width="912" height="168" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
   <text x="44" y="138" font-size="12" font-weight="bold" fill="#475569">每帧视觉主路（NPU）</text>
 
-  <rect x="40" y="155" width="88" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
-  <text x="84" y="178" text-anchor="middle" font-size="12" font-weight="bold">摄像头</text>
-  <text x="84" y="194" text-anchor="middle" font-size="9" fill="#64748b">V4L2 / 视频</text>
+  <!-- 浅色框：所有矩形起始 x=60，间距30px，宽度与黄色框对应 -->
+  <!-- 矩形1 摄像头 宽130 -->
+  <rect x="60" y="155" width="130" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="125" y="178" text-anchor="middle" font-size="12" font-weight="bold">摄像头</text>
+  <text x="125" y="194" text-anchor="middle" font-size="9" fill="#64748b">V4L2 / 视频</text>
 
-  <rect x="148" y="155" width="100" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
-  <text x="198" y="178" text-anchor="middle" font-size="12" font-weight="bold">capture</text>
-  <text x="198" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/capture/</text>
+  <!-- 矩形2 capture 宽120 -->
+  <rect x="220" y="155" width="120" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="280" y="178" text-anchor="middle" font-size="12" font-weight="bold">capture</text>
+  <text x="280" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/capture/</text>
 
-  <rect x="268" y="155" width="108" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
-  <text x="322" y="178" text-anchor="middle" font-size="12" font-weight="bold">Pipeline</text>
-  <text x="322" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/engine/</text>
+  <!-- 矩形3 Pipeline 宽110 -->
+  <rect x="370" y="155" width="110" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="425" y="178" text-anchor="middle" font-size="12" font-weight="bold">Pipeline</text>
+  <text x="425" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/engine/</text>
 
-  <rect x="396" y="128" width="88" height="52" rx="5" fill="#fff" stroke="#0ea5e9" stroke-width="1.5"/>
-  <text x="440" y="150" text-anchor="middle" font-size="12" font-weight="bold">YOLO</text>
-  <text x="440" y="164" text-anchor="middle" font-size="9" fill="#64748b">adapters/yolo</text>
+  <!-- YOLO 和 SCRFD 上下并列，宽度相同（100），x相同=510 -->
+  <rect x="510" y="128" width="100" height="52" rx="5" fill="#fff" stroke="#0ea5e9" stroke-width="1.5"/>
+  <text x="560" y="150" text-anchor="middle" font-size="12" font-weight="bold">YOLO</text>
+  <text x="560" y="164" text-anchor="middle" font-size="9" fill="#64748b">adapters/yolo</text>
 
-  <rect x="396" y="188" width="88" height="52" rx="5" fill="#fff" stroke="#0ea5e9" stroke-width="1.5"/>
-  <text x="440" y="210" text-anchor="middle" font-size="12" font-weight="bold">SCRFD</text>
-  <text x="440" y="224" text-anchor="middle" font-size="9" fill="#64748b">adapters/scrfd</text>
+  <rect x="510" y="188" width="100" height="52" rx="5" fill="#fff" stroke="#0ea5e9" stroke-width="1.5"/>
+  <text x="560" y="210" text-anchor="middle" font-size="12" font-weight="bold">SCRFD</text>
+  <text x="560" y="224" text-anchor="middle" font-size="9" fill="#64748b">adapters/scrfd</text>
 
-  <rect x="504" y="155" width="100" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
-  <text x="554" y="178" text-anchor="middle" font-size="12" font-weight="bold">display</text>
-  <text x="554" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/display/</text>
+  <!-- 矩形6 display 宽110 -->
+  <rect x="640" y="155" width="110" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="695" y="178" text-anchor="middle" font-size="12" font-weight="bold">display</text>
+  <text x="695" y="194" text-anchor="middle" font-size="9" fill="#64748b">runtime/display/</text>
 
-  <rect x="624" y="155" width="88" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
-  <text x="668" y="178" text-anchor="middle" font-size="12" font-weight="bold">预览窗口</text>
-  <text x="668" y="194" text-anchor="middle" font-size="9" fill="#64748b">OpenCV</text>
+  <!-- 矩形7 预览窗口 宽100 -->
+  <rect x="780" y="155" width="100" height="58" rx="5" fill="#fff" stroke="#64748b" stroke-width="1.5"/>
+  <text x="830" y="178" text-anchor="middle" font-size="12" font-weight="bold">预览窗口</text>
+  <text x="830" y="194" text-anchor="middle" font-size="9" fill="#64748b">OpenCV</text>
 
-  <line x1="128" y1="184" x2="143" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="248" y1="184" x2="263" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="376" y1="184" x2="391" y2="154" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="376" y1="184" x2="391" y2="214" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="484" y1="154" x2="499" y2="174" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="484" y1="214" x2="499" y2="194" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
-  <line x1="604" y1="184" x2="619" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- 横向箭头 长度25像素 -->
+  <!-- 摄像头(右边界190) → capture(左边界220) -->
+  <line x1="190" y1="184" x2="215" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- capture(右边界340) → Pipeline(左边界370) -->
+  <line x1="340" y1="184" x2="365" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- Pipeline → YOLO（斜线，指向YOLO左侧） -->
+  <line x1="480" y1="184" x2="505" y2="154" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- Pipeline → SCRFD（斜线，指向SCRFD左侧） -->
+  <line x1="480" y1="184" x2="505" y2="214" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- YOLO → display（斜线，从YOLO右侧指向display左侧） -->
+  <line x1="610" y1="154" x2="635" y2="174" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- SCRFD → display（斜线，从SCRFD右侧指向display左侧） -->
+  <line x1="610" y1="214" x2="635" y2="194" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- display(右边界750) → 预览窗口(左边界780) -->
+  <line x1="750" y1="184" x2="775" y2="184" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
 
   <!-- dialogue band -->
   <rect x="24" y="302" width="912" height="210" rx="8" fill="#fefce8" stroke="#fde047" stroke-width="1"/>
   <text x="44" y="322" font-size="12" font-weight="bold" fill="#713f12">策略与对话旁路（按需）</text>
 
+  <!-- 黄色框内矩形布局保持不变，间距30px -->
   <rect x="60" y="338" width="130" height="58" rx="5" fill="#fff" stroke="#d97706" stroke-width="1.5"/>
   <text x="125" y="361" text-anchor="middle" font-size="12" font-weight="bold">ModelCoordinator</text>
   <text x="125" y="377" text-anchor="middle" font-size="9" fill="#64748b">runtime/platform/</text>
@@ -85,6 +101,7 @@
   <text x="830" y="361" text-anchor="middle" font-size="12" font-weight="bold">扬声器</text>
   <text x="830" y="377" text-anchor="middle" font-size="9" fill="#64748b">gst-play-1.0</text>
 
+  <!-- 底部的 YOU/AI/SYS 矩形 -->
   <rect x="240" y="430" width="56" height="32" rx="4" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
   <text x="268" y="450" text-anchor="middle" font-size="10" font-weight="bold" fill="#065f46">YOU</text>
 
@@ -94,28 +111,31 @@
   <rect x="600" y="430" width="56" height="32" rx="4" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
   <text x="628" y="450" text-anchor="middle" font-size="10" font-weight="bold" fill="#065f46">SYS</text>
 
-  <!-- dialogue solid arrows -->
+  <!-- 黄色框内实线箭头（横向，长度25px） -->
   <line x1="190" y1="367" x2="215" y2="367" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <line x1="340" y1="367" x2="365" y2="367" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <line x1="480" y1="367" x2="505" y2="367" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <line x1="610" y1="367" x2="635" y2="367" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <line x1="750" y1="367" x2="775" y2="367" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- 从 YOU/AI/SYS 向上的实线箭头 -->
   <line x1="268" y1="430" x2="268" y2="400" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <line x1="560" y1="396" x2="448" y2="428" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
 
-  <!-- dashed: app to pipeline & coordinator -->
+  <!-- 虚线：app → pipeline（保持原样） -->
   <line x1="440" y1="106" x2="322" y2="150" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
+  <!-- 虚线：app → ModelCoordinator（保持原样） -->
   <line x1="520" y1="106" x2="125" y2="333" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
+  <!-- 虚线：vision signals → ModelCoordinator（保持原样） -->
+  <line x1="560" y1="240" x2="125" y2="333" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
+  <text x="320" y="278" font-size="9" fill="#94a3b8">person / face 信号</text>
 
-  <!-- dashed: vision signals to coordinator -->
-  <line x1="440" y1="240" x2="125" y2="333" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
-  <text x="248" y="278" font-size="9" fill="#94a3b8">person / face 信号</text>
+  <!-- 虚线：LlmGreeting → TtsWorker（修改为从下边中点引出，短斜线+长水平线+短斜线） -->
+  <!-- LlmGreeting 下边中点 (280,396)，先短斜下到 (300,420)，水平到 (675,420)，再短斜上到 TtsWorker 下边中点 (695,396) -->
+  <polyline points="280,396 300,420 675,420 695,396" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
+  <text x="460" y="414" text-anchor="middle" font-size="9" fill="#94a3b8">AI&gt; 文案 · PlayText</text>
 
-  <!-- dashed: greeting to TTS -->
-  <line x1="310" y1="396" x2="695" y2="396" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
-  <text x="480" y="412" text-anchor="middle" font-size="9" fill="#94a3b8">AI&gt; 文案 · PlayText</text>
-
-  <!-- legend -->
+  <!-- 图例 -->
   <line x1="720" y1="528" x2="760" y2="528" stroke="#475569" stroke-width="2" marker-end="url(#arr)"/>
   <text x="770" y="532" font-size="10" fill="#64748b">实线 · 帧/数据</text>
   <line x1="720" y1="548" x2="760" y2="548" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrDash)"/>
