@@ -64,9 +64,7 @@
 |------|------|
 | [系统架构与运行逻辑.md](系统架构与运行逻辑.md) | 平台框架、加载顺序、参考应用场景 |
 | [接续开发说明.md](接续开发说明.md) | 目录、多槽、配置、编译 |
-| [适配器-YOLO.md](适配器-YOLO.md) | YOLO 适配器 |
-| [适配器-LLM.md](适配器-LLM.md) | LLM 适配器 |
-| [适配器-TTS.md](适配器-TTS.md) | TTS 适配器 |
+| [适配器说明.md](适配器说明.md) | YOLO / SCRFD / LLM / TTS 适配器速览 |
 | [LLM与ModelCoordinator集成.md](LLM与ModelCoordinator集成.md) | RKLLM、门控、终端 UX |
 | [TTS与MeloTTS集成说明.md](TTS与MeloTTS集成说明.md) | MeloTTS 配置与验收 |
 | [YOLO与SCRFD问题排查记录.md](YOLO与SCRFD问题排查记录.md) | 路径与拓扑排障 |

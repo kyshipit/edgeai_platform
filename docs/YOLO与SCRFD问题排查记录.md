@@ -163,7 +163,7 @@ flowchart TD
 | `app/main.cc` | 读取 `model.yolo.path` / `model.scrfd.path`（无路径启发式） |
 | `adapters/scrfd/scrfd_postprocess.cpp` | `ResolveScrfdHeadOutputs` 按名解析 9 路输出 |
 | `engine/pipeline.cpp` | 队列 `TryPush` 避免停机死锁 |
-| [适配器-YOLO.md](适配器-YOLO.md) | 后处理约束说明 |
+| [适配器说明.md](适配器说明.md) § YOLO | 后处理约束说明 |
 
 ---
 
@@ -200,7 +200,7 @@ flowchart TD
 |------|------|
 | [接续开发说明.md](接续开发说明.md) | 目录结构、切换语义、配置、常见问题 |
 | [错误修复调试说明.md](错误修复调试说明.md) | SIGSEGV、退出顺序、sentinel 任务 |
-| [适配器-YOLO.md](适配器-YOLO.md) | YOLO 后处理约定 |
+| [适配器说明.md](适配器说明.md) § YOLO | YOLO 后处理约定 |
 
 ---
 

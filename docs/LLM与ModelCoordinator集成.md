@@ -27,6 +27,8 @@
 | API | `rkllm_init` / **`rkllm_run`（同步）** / callback → `rkllm_session` |
 | 第三方 | `runtime/3rdparty/rkllm/`：`rkllm.h`、`librkllmrt.so`、`libgomp.so` |
 
+适配器文件与路径速览见 [适配器说明.md](适配器说明.md) § LLM。
+
 ---
 
 ## 2. 挂钩方案（结论）
@@ -190,7 +192,7 @@ LlmPromptSource: FaceAppear | FaceReenter | Microphone | Button | Command
 |------|------|
 | 按键输入 | `Button` source |
 | SCRFD 五点 overlay | 后处理已有坐标，绘制待接 |
-| TTS v2 按句播 | v1 已集成 MeloTTS（见 [适配器-TTS.md](适配器-TTS.md)）；增量句界 + 边生成边播未做 |
+| TTS v2 按句播 | v1 已集成 MeloTTS（见 [适配器说明.md](适配器说明.md) § TTS）；增量句界 + 边生成边播未做 |
 | 对话期减视觉负载 | 可选：对话中降帧或缩槽 |
 | 日志插屏 | 状态迁移多为 `LogDebug`；FPS 等 `LogInfo` 仍可能频繁 |
 
@@ -254,7 +256,7 @@ model:
 |------|------|
 | [系统架构与运行逻辑.md](系统架构与运行逻辑.md) | 平台总览、加载顺序 |
 | [接续开发说明.md](接续开发说明.md) | 目录、多槽、编译 |
-| [适配器-LLM.md](适配器-LLM.md) | LLM 适配器速览 |
+| [适配器说明.md](适配器说明.md) § LLM | LLM 适配器速览 |
 | [模型演进与待办.md](模型演进与待办.md) | 演进路线与 backlog |
 
 ---

@@ -13,6 +13,8 @@
 
 技术选型：板端 **MeloTTS `ZH_MIX_EN`**（encoder/decoder RKNN + `lexicon.txt` / `tokens.txt`）。已弃用 `mms_tts` 英文音素方案。TTS 与 RKLLM 同为旁路，**不进**视觉 Pipeline / `IModelCoordinator`。
 
+适配器文件与路径速览见 [适配器说明.md](适配器说明.md) § TTS。
+
 ## 2. 模块
 
 | 文件 | 职责 |
@@ -74,7 +76,7 @@ TtsWorker → MeloTtsSession → RKNN → /tmp/edgeai_tts.wav → gst-play-1.0 -
 
 ## 7. 相关文档
 
-- [适配器-TTS.md](适配器-TTS.md)
+- [适配器说明.md](适配器说明.md) § TTS
 - [LLM与ModelCoordinator集成.md](LLM与ModelCoordinator集成.md)
 - [接续开发说明.md](接续开发说明.md)
 
